@@ -39,15 +39,13 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     testImplementation 'junit:junit:4.12'
-
     implementation project(':library')
     implementation project(':widget')
-
     implementation rootProject.ext.dependencies["butterknife"]
     annotationProcessor rootProject.ext.dependencies["butterknife-compiler"]
-
     implementation rootProject.ext.dependencies["dagger"]
     annotationProcessor rootProject.ext.dependencies["dagger-compiler"]
-
     implementation rootProject.ext.dependencies["retrofit2-fastjson-converter"]
+    implementation files('src/main/lib/GDTUnionSDK.4.14.558.min.jar')
+    implementation files('src/main/lib/android-query-full.0.26.7.jar')
 }

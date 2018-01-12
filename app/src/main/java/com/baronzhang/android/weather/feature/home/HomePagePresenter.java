@@ -57,6 +57,7 @@ public final class HomePagePresenter implements HomePageContract.Presenter {
                 .compose(RxSchedulerUtils.normalSchedulersTransformer())
                 .subscribe(weatherView::displayWeatherInformation, throwable -> {
                     Toast.makeText(context, throwable.getMessage(), Toast.LENGTH_LONG).show();
+                    throwable.printStackTrace();
                 });
         subscriptions.add(subscription);
     }

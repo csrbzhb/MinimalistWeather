@@ -2,7 +2,6 @@ package com.baronzhang.android.weather.feature.home;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.GridLayoutManager;
@@ -13,28 +12,24 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.androidquery.AQuery;
 import com.baronzhang.android.weather.AppConstants;
-import com.baronzhang.android.weather.base.BaseFragment;
 import com.baronzhang.android.weather.R;
+import com.baronzhang.android.weather.base.BaseFragment;
+import com.baronzhang.android.weather.data.WeatherDetail;
 import com.baronzhang.android.weather.data.db.entities.minimalist.AirQualityLive;
-import com.baronzhang.android.weather.data.db.entities.minimalist.WeatherForecast;
 import com.baronzhang.android.weather.data.db.entities.minimalist.LifeIndex;
 import com.baronzhang.android.weather.data.db.entities.minimalist.Weather;
-import com.baronzhang.android.weather.data.WeatherDetail;
+import com.baronzhang.android.weather.data.db.entities.minimalist.WeatherForecast;
 import com.baronzhang.android.widget.IndicatorView;
-import com.qq.e.ads.cfg.VideoOption;
-import com.qq.e.ads.nativ.ADSize;
-import com.qq.e.ads.nativ.NativeExpressAD;
-import com.qq.e.ads.nativ.NativeExpressADView;
+import com.qq.e.ads.nativ.NativeAD;
+import com.qq.e.ads.nativ.NativeADDataRef;
+import com.qq.e.comm.constants.AdPatternType;
 import com.qq.e.comm.util.AdError;
+import com.qq.e.comm.util.GDTLogger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,8 +38,8 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
 
-public class HomePageFragment extends BaseFragment implements HomePageContract.View, NativeExpressAD.NativeExpressADListener {
-    private static final String TAG = "HomePageFragment";
+public class HomePageFragmentAdbk extends BaseFragment implements HomePageContract.View,NativeAD.NativeAdListener {
+
     //AQI
     @BindView(R.id.tv_aqi)
     TextView aqiTextView;
@@ -84,19 +79,17 @@ public class HomePageFragment extends BaseFragment implements HomePageContract.V
     private LifeIndexAdapter lifeIndexAdapter;
 
     private HomePageContract.Presenter presenter;
-    private ViewGroup adcontainer;
-    private NativeExpressAD nativeExpressAD;
-    private NativeExpressADView nativeExpressADView;
-    private int adWidth, adHeight; // 广告宽高
-    private boolean isAdFullWidth = true, isAdAutoHeight =true; // 是否采用了ADSize.FULL_WIDTH，ADSize.AUTO_HEIGHT
-
-    public HomePageFragment() {
+    protected AQuery $;
+    private NativeADDataRef adItem;
+    private NativeAD nativeAD;
+    View rootView;
+    public HomePageFragmentAdbk() {
 
     }
 
-    public static HomePageFragment newInstance() {
+    public static HomePageFragmentAdbk newInstance() {
 
-        return new HomePageFragment();
+        return new HomePageFragmentAdbk();
     }
 
     @Override
@@ -113,9 +106,9 @@ public class HomePageFragment extends BaseFragment implements HomePageContract.V
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View rootView = inflater.inflate(R.layout.fragment_home_page, container, false);
+        rootView = inflater.inflate(R.layout.fragment_home_page, container, false);
         unbinder = ButterKnife.bind(this, rootView);
-        adcontainer = (ViewGroup) rootView.findViewById(R.id.fl_container);
+        $ = new AQuery(getContext());
         //天气详情
         detailRecyclerView.setNestedScrollingEnabled(false);
         detailRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 3));
@@ -141,7 +134,7 @@ public class HomePageFragment extends BaseFragment implements HomePageContract.V
         lifeIndexRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 4));
         lifeIndices = new ArrayList<>();
         lifeIndexAdapter = new LifeIndexAdapter(getActivity(), lifeIndices);
-        lifeIndexAdapter.setOnItemClickListener((adapterView, view, i, l) -> Toast.makeText(HomePageFragment.this.getContext(), lifeIndices.get(i).getDetails(), Toast.LENGTH_LONG).show());
+        lifeIndexAdapter.setOnItemClickListener((adapterView, view, i, l) -> Toast.makeText(HomePageFragmentAdbk.this.getContext(), lifeIndices.get(i).getDetails(), Toast.LENGTH_LONG).show());
         lifeIndexRecyclerView.setItemAnimator(new DefaultItemAnimator());
         lifeIndexRecyclerView.setAdapter(lifeIndexAdapter);
 
@@ -164,7 +157,7 @@ public class HomePageFragment extends BaseFragment implements HomePageContract.V
         super.onResume();
         assert presenter != null;
         presenter.subscribe();
-        refreshAd();
+        loadAD();
     }
 
     @SuppressLint("SetTextI18n")
@@ -236,112 +229,108 @@ public class HomePageFragment extends BaseFragment implements HomePageContract.V
         void addOrUpdateCityListInDrawerMenu(Weather weather);
     }
 
-    private void refreshAd() {
-        try {
-            /**
-             *  如果选择支持视频的模版样式，请使用{@link Constants#NativeExpressSupportVideoPosID}
-             */
-            nativeExpressAD = new NativeExpressAD(getContext(), getMyADSize(), AppConstants.APPID, AppConstants.NativePosID, this); // 这里的Context必须为Activity
-            nativeExpressAD.setVideoOption(new VideoOption.Builder()
-                    .setAutoPlayPolicy(VideoOption.AutoPlayPolicy.WIFI) // 设置什么网络环境下可以自动播放视频
-                    .setAutoPlayMuted(true) // 设置自动播放视频时，是否静音
-                    .build()); // setVideoOption是可选的，开发者可根据需要选择是否配置
-            nativeExpressAD.loadAD(1);
-        } catch (NumberFormatException e) {
-            Log.w(TAG, "ad size invalid.");
-            Toast.makeText(getContext(), "请输入合法的宽高数值", Toast.LENGTH_SHORT).show();
+
+    public void loadAD() {
+        if (nativeAD == null) {
+            this.nativeAD = new NativeAD(getContext(), AppConstants.APPID, AppConstants.NativePosID, this);
         }
-    }
-
-    private ADSize getMyADSize() {
-        int w = isAdFullWidth ? ADSize.FULL_WIDTH : adWidth;
-        int h = isAdAutoHeight ? ADSize.AUTO_HEIGHT : adHeight;
-        return new ADSize(w, h);
+        int count = 1; // 一次拉取的广告条数：范围1-10
+        nativeAD.loadAD(count);
     }
 
 
-    @Override
-    public void onNoAD(AdError adError) {
-        Log.i(
-                TAG,
-                String.format("onNoAD, error code: %d, error msg: %s", adError.getErrorCode(),
-                        adError.getErrorMsg()));
-    }
-
-    @Override
-    public void onADLoaded(List<NativeExpressADView> adList) {
-        Log.i(TAG, "onADLoaded: " + adList.size());
-        // 释放前一个展示的NativeExpressADView的资源
-        if (nativeExpressADView != null) {
-            nativeExpressADView.destroy();
+    /**
+     * 展示原生广告时，一定要先调用onExposured接口曝光广告，否则将无法调用onClicked点击接口
+     */
+    public void showAD() {
+        if (adItem.getAdPatternType() == AdPatternType.NATIVE_3IMAGE) {
+            GDTLogger.d("show three img ad.");
+            rootView.findViewById(R.id.native_3img_ad_container).setVisibility(View.VISIBLE);
+            rootView.findViewById(R.id.native_ad_container).setVisibility(View.INVISIBLE);
+            $.id(R.id.img_1).image(adItem.getImgList().get(0), false, true);
+            $.id(R.id.img_2).image(adItem.getImgList().get(1), false, true);
+            $.id(R.id.img_3).image(adItem.getImgList().get(2), false, true);
+            $.id(R.id.native_3img_title).text((String) adItem.getTitle());
+            $.id(R.id.native_3img_desc).text((String) adItem.getDesc());
+        } else if (adItem.getAdPatternType() == AdPatternType.NATIVE_2IMAGE_2TEXT) {
+            GDTLogger.d("show two img ad.");
+            rootView.findViewById(R.id.native_3img_ad_container).setVisibility(View.INVISIBLE);
+            rootView.findViewById(R.id.native_ad_container).setVisibility(View.VISIBLE);
+            $.id(R.id.img_logo).image((String) adItem.getIconUrl(), false, true);
+            $.id(R.id.img_poster).image(adItem.getImgUrl(), false, true);
+            $.id(R.id.text_name).text((String) adItem.getTitle());
+            $.id(R.id.text_desc).text((String) adItem.getDesc());
         }
-
-        if (adcontainer.getVisibility() != View.VISIBLE) {
-            adcontainer.setVisibility(View.VISIBLE);
-        }
-
-        if (adcontainer.getChildCount() > 0) {
-            adcontainer.removeAllViews();
-        }
-
-        nativeExpressADView = adList.get(0);
-        // 广告可见才会产生曝光，否则将无法产生收益。
-        adcontainer.addView(nativeExpressADView);
-        nativeExpressADView.render();
-    }
-
-    @Override
-    public void onRenderFail(NativeExpressADView adView) {
-        Log.i(TAG, "onRenderFail");
-    }
-
-    @Override
-    public void onRenderSuccess(NativeExpressADView adView) {
-        Log.i(TAG, "onRenderSuccess");
-    }
-
-    @Override
-    public void onADExposure(NativeExpressADView adView) {
-        Log.i(TAG, "onADExposure");
-    }
-
-    @Override
-    public void onADClicked(NativeExpressADView adView) {
-        Log.i(TAG, "onADClicked");
-    }
-
-    @Override
-    public void onADClosed(NativeExpressADView adView) {
-        Log.i(TAG, "onADClosed");
-        // 当广告模板中的关闭按钮被点击时，广告将不再展示。NativeExpressADView也会被Destroy，释放资源，不可以再用来展示。
-        if (adcontainer != null && adcontainer.getChildCount() > 0) {
-            adcontainer.removeAllViews();
-            adcontainer.setVisibility(View.GONE);
-        }
-    }
-
-    @Override
-    public void onADLeftApplication(NativeExpressADView adView) {
-        Log.i(TAG, "onADLeftApplication");
-    }
-
-    @Override
-    public void onADOpenOverlay(NativeExpressADView adView) {
-        Log.i(TAG, "onADOpenOverlay");
-    }
-
-    @Override
-    public void onADCloseOverlay(NativeExpressADView adView) {
-        Log.i(TAG, "onADCloseOverlay");
+        $.id(R.id.btn_download).text(getADButtonText());
+        adItem.onExposured(this. rootView.findViewById(R.id.nativeADContainer)); // 需要先调用曝光接口
+        $.id(R.id.btn_download).clicked(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                adItem.onClicked(view); // 点击接口
+            }
+        });
     }
 
     /**
-     * 注意：带有视频的广告被点击后会进入全屏播放视频，此时视频可以跟随屏幕方向的旋转而旋转，
-     * 请开发者注意处理好自己的Activity的运行时变更，不要让Activity销毁。
-     * 例如，在AndroidManifest文件中给Activity添加属性android:configChanges="keyboard|keyboardHidden|orientation|screenSize"，
+     * App类广告安装、下载状态的更新（普链广告没有此状态，其值为-1） 返回的AppStatus含义如下： 0：未下载 1：已安装 2：已安装旧版本 4：下载中（可获取下载进度“0-100”）
+     * 8：下载完成 16：下载失败
      */
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
+    private String getADButtonText() {
+        if (adItem == null) {
+            return "……";
+        }
+        if (!adItem.isAPP()) {
+            return "查看详情";
+        }
+        switch (adItem.getAPPStatus()) {
+            case 0:
+                return "点击下载";
+            case 1:
+                return "点击启动";
+            case 2:
+                return "点击更新";
+            case 4:
+                return adItem.getProgress() > 0 ? "下载中" + adItem.getProgress()+ "%" : "下载中"; // 特别注意：当进度小于0时，不要使用进度来渲染界面
+            case 8:
+                return "下载完成";
+            case 16:
+                return "下载失败,点击重试";
+            default:
+                return "查看详情";
+        }
     }
+
+
+    @Override
+    public void onADLoaded(List<NativeADDataRef> arg0) {
+        if (arg0.size() > 0) {
+            adItem = arg0.get(0);
+            showAD();
+            Toast.makeText(getContext(), "原生广告加载成功", Toast.LENGTH_LONG).show();
+        } else {
+            Log.i("AD_DEMO", "NOADReturn");
+        }
+    }
+
+    @Override
+    public void onADStatusChanged(NativeADDataRef arg0) {
+        $.id(R.id.btn_download).text(getADButtonText());
+    }
+
+    @Override
+    public void onADError(NativeADDataRef adData, AdError error) {
+        Log.i(
+                "AD_DEMO",
+                String.format("onADError, error code: %d, error msg: %s", error.getErrorCode(),
+                        error.getErrorMsg()));
+    }
+
+    @Override
+    public void onNoAD(AdError error) {
+        Log.i(
+                "AD_DEMO",
+                String.format("onNoAD, error code: %d, error msg: %s", error.getErrorCode(),
+                        error.getErrorMsg()));
+    }
+
 }
